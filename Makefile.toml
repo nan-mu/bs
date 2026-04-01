@@ -1,0 +1,19 @@
+extend = [
+    { path = "make/firmware.toml" }
+]
+
+[tasks.build]
+alias = "build_dispatcher"
+
+[tasks.build_dispatcher]
+private = false
+extend = "subcommand"
+env = { "SUBCOMMAND_PREFIX" = "build" }
+
+[tasks.subcommand]
+private = true
+script = '''
+#!@duckscript
+
+cm_run_task ${SUBCOMMAND_PREFIX}_${1}
+'''

@@ -1,0 +1,40 @@
+[tasks.common-context]
+private = true
+cwd = "${CARGO_MAKE_CURRENT_TASK_INITIAL_MAKEFILE_DIRECTORY}"
+
+[tasks.common-context.env]
+"PATH" = "${HOME}/.cargo/bin:${PATH}"
+"IDF_TOOLS_PATH" = "${CARGO_MAKE_COMMAND}/.embuild/espressif"
+
+[tasks.build_firmware]
+private = true
+extend = "common-context"
+script = ["echo true"]
+dependencies = [
+    "assure_existing_ldproxy",
+    "assure_existing_nightly-aarch64-apple-darwin-cargo"
+]
+
+[tasks.assure_existing_ldproxy]
+private = true
+extend = "common-context"
+
+[tasks.assure_existing_ldproxy.condition]
+files_exist = [ "${HOME}/.cargo/bin/ldproxy" ]
+fail_message = '''
+Error: ldproxy is not installed in $HOME/.cargo/bin
+Install it with: 
+curl -L https://github.com/esp-rs/embuild/releases/latest/download/ldproxy-aarch64-apple-darwin.zip | funzip > $HOME/.cargo/bin/ldproxy; chmod +x $HOME/.cargo/bin/ldproxy
+'''
+
+[tasks.assure_existing_nightly-aarch64-apple-darwin-cargo]
+private = true
+extend = "common-context"
+
+[tasks.assure_existing_nightly-aarch64-apple-darwin-cargo.condition]
+files_exist = [ "${HOME}/.rustup/toolchains/nightly-aarch64-apple-darwin/bin/cargo" ]
+fail_message = '''
+Error: nightly toolchain cargo not found at $HOME/.rustup/toolchains/nightly-aarch64-apple-darwin/bin/cargo
+Install the toolchain with: 
+rustup toolchain install nightly && rustup component add rust-src --toolchain nightly
+'''
