@@ -1,3 +1,11 @@
 [submodule "libbpf"]
 	path = libbpf
 	url = https://github.com/libbpf/libbpf.git
+
+[submodule "aot"]
+	path = aot
+	url = git@github.com:nan-mu/aot.git
+
+[submodule "firmware"]
+	path = firmware
+	url = git@github.com:nan-mu/firmware.git
