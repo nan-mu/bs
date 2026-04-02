@@ -5,12 +5,13 @@ cwd = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/firmware"
 [tasks.common-context.env]
 "PATH" = "${HOME}/.cargo/bin:${PATH}"
 "IDF_TOOLS_PATH" = "${CARGO_MAKE_WORKING_DIRECTORY}/.embuild/espressif"
+"RUSTUP_TOOLCHAIN" = "nightly"
 
 [tasks.build_firmware]
 private = true
 extend = "common-context"
 command = "rustup"
-args = ["run", "nightly", "cargo", "build", "--release"]
+args = ["run", "nightly", "cargo", "build"]
 dependencies = [
     "assure_existing_ldproxy",
     "assure_existing_nightly-aarch64-apple-darwin-cargo",
