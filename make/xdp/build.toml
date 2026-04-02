@@ -1,0 +1,86 @@
+[tasks.build_xdp]
+private = true
+cwd = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/xdp"
+dependencies = ["download_vmlinux", "check_libbpf"]
+condition = { files_modified = { input = [
+    "${CARGO_MAKE_WORKING_DIRECTORY}/*.c",
+], output = [
+    "${CARGO_MAKE_WORKING_DIRECTORY}/*.o",
+] } }
+script_runner = "@duckscript"
+script = '''
+input_path = set "${CARGO_MAKE_WORKING_DIRECTORY}/*.c"
+
+files = glob_array ${input_path}
+files_count = array_length ${files}
+
+if eq ${files_count} 0
+    echo "error: not find files match '${input_path}'"
+    exit 1
+end
+
+output_dir = set ${CARGO_MAKE_WORKING_DIRECTORY}
+
+for file in ${files}
+    basename = basename ${file}
+    obj_name = replace ${basename} ".c" ".o"
+
+    set_env IN ${file}
+    set_env OUT ${output_dir}/${obj_name}
+    cm_run_task clang_xdp
+end
+'''
+
+[tasks.clang_xdp]
+private = true
+cwd = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/xdp"
+command = "clang"
+args = [
+    "-O2",
+    "-g",
+    "-target",
+    "bpf",
+    "-Wno-missing-declarations",
+    "-c",
+    "${IN}",
+    "-o",
+    "${OUT}",
+    "-I",
+    "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/libbpf/src",
+    "--include",
+    "${CARGO_MAKE_WORKING_DIRECTORY}/vmlinux.h",
+    "--include",
+    "${CARGO_MAKE_WORKING_DIRECTORY}/xdp_protocol_def.h",
+]
+
+[tasks.check_libbpf]
+private = false
+cwd = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/libbpf"
+script_runner = "@duckscript"
+script = '''
+version = exec git describe --tags --exact-match
+
+if is_empty trim ${version.stderr}
+    echo "[check_libbpf] WARN - ${version.stderr}"
+end
+
+stdout = trim ${version.stdout}
+
+if not eq ${stdout} "v1.7.0"
+    echo "[check_libbpf] ERROR - libbpf version is ${stdout}, please checkout to v1.7.0."
+    exit 1
+end
+'''
+
+[tasks.download_vmlinux]
+private = true
+cwd = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/xdp"
+description = "Check and download vmlinux.h for riscv64"
+condition = { files_not_exist = ["${CARGO_MAKE_WORKING_DIRECTORY}/vmlinux.h"] }
+script = '''
+URL="https://raw.githubusercontent.com/libbpf/vmlinux.h/main/include/riscv64/vmlinux_6.19.h"
+echo "vmlinux.h not found, downloading..."
+curl -L -o ${CARGO_MAKE_WORKING_DIRECTORY}/vmlinux.h $URL
+chmod 444 ${CARGO_MAKE_WORKING_DIRECTORY}/vmlinux.h
+echo "Done."
+'''

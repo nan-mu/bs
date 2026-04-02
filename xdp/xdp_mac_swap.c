@@ -1,6 +1,5 @@
-#include <linux/bpf.h>
-#include <linux/if_ether.h>
-#include <bpf/bpf_helpers.h>
+#include <bpf_helpers.h>
+#include <bpf_endian.h>
 
 SEC("xdp")
 int xdp_mac_swap_tx(struct xdp_md *ctx) {

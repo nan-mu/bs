@@ -1,5 +1,6 @@
 extend = [
-    { path = "make/firmware.toml" }
+    { path = "make/firmware.toml" },
+    { path = "make/xdp.toml" }
 ]
 
 [tasks.build]
