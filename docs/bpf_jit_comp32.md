@@ -52,24 +52,54 @@ Stack layout during BPF program execution:
 内核现有实现采用自高地址向低地址的分层布局：顶部为 `ra/fp/s1..s7` 的保存区，其下为 JIT scratch 区，再下为 BPF 程序栈区，最底部为普通调用栈区。该布局能够保证预处理与后处理（prologue/epilogue）的对称性以此简化指令实现，原因在于保存区的地址在函数全程保持稳定：在prologue 中，代码先一次性确定栈帧大小，再按固定偏移将 `ra/fp/s1..s7` 写入保存区；在 epilogue 中，代码按同一组偏移逆过程读回这些寄存器。由于 scratch 写入与 BPF 栈访问均被约束在保存区之外，执行期间不会改写或重定位保存槽位，因此入口与出口始终针对同一寄存器集合和同一地址集合进行互逆操作。进一步地，`STACK_OFFSET` 统一定义了栈槽偏移，`bpf_get_reg*` 与 `bpf_put_reg*` 仅在各自所属区域内进行取放，从而在满足 ABI 约束的同时维持 BPF 语义正确性。
 
 ### 枚举与宏
-- `enum { BPF_R6_HI, ... BPF_AX_LO, BPF_JIT_SCRATCH_REGS }`
-  - 定义栈上 scratch 槽位（高/低 32 位分离）
-- `NR_SAVED_REGISTERS = 9`
-  - 对应 `ra, fp, s1..s7`
-- `STACK_OFFSET(k)`
-  - 计算栈上 BPF 寄存器槽位相对 `fp` 偏移
-- `TMP_REG_1 / TMP_REG_2`
-  - JIT 逻辑临时寄存器号
-- `RV_REG_TCC / RV_REG_TCC_SAVED`
-  - 尾调用计数器与备份寄存器
 
-### 1.4 `bpf2rv32` 映射表
-把 BPF 64 位寄存器映射为 `{hi, lo}` 两个 RV32 位置：
-- 一部分映射到真实寄存器（如 R0/R1-R5/FP）
-- 一部分映射到栈偏移（负值表示“在栈上”）
-- 还预留 JIT 临时寄存器 `TMP_REG_1/2`
+本节面向 RV32 eBPF JIT 的寄存器与栈槽约束进行符号化定义，其核心目标是将多组底层约束收敛为统一接口，包括 BPF 64 位寄存器在 RV32 上的 hi/lo 拆分表示、落栈寄存器在栈帧中的槽位编号与相对 `fp` 的偏移寻址，以及 JIT 内部临时寄存器与尾调用计数寄存器的稳定绑定。若上述约束以分散常量散布于实现逻辑，将导致偏移语义不一致、槽位冲突，并使寄存器映射与栈寻址关系难以整体校验。
 
----
+```c
+enum {
+	/*
+	 * 栈布局：以下枚举值表示 JIT scratch 区顶部起算的槽位编号。
+	 * 由于 BPF 寄存器语义为 64 位，RV32 后端以两个 32 位槽位（hi/lo）承载。
+	 * 因此 R6-R9 以及 BPF_REG_AX 均以 HI/LO 成对定义，以固定其在 scratch 区的顺序。
+	 */
+	BPF_R6_HI,
+	BPF_R6_LO,
+	BPF_R7_HI,
+	BPF_R7_LO,
+	BPF_R8_HI,
+	BPF_R8_LO,
+	BPF_R9_HI,
+	BPF_R9_LO,
+	BPF_AX_HI,
+	BPF_AX_LO,
+
+	/* scratch 区槽位总数：覆盖 BPF_REG_6..BPF_REG_9 与 BPF_REG_AX 的 hi/lo 槽位。 */
+	BPF_JIT_SCRATCH_REGS,
+};
+
+/*
+ * 进入/退出路径需要保存的被调用者保存寄存器（callee-saved）数量。
+ * 对应寄存器集合为：ra、fp、s1..s7，共 9 个。
+ */
+#define NR_SAVED_REGISTERS	9
+
+/*
+ * 将逻辑槽位编号 k 映射为相对 fp 的字节偏移（负值表示位于 fp 下方）。
+ * 其中：
+ * -4                  表示从 fp 下方第一个字（4 字节）位置开始；
+ * 4*NR_SAVED_REGISTERS 表示越过 callee-saved 保存区；
+ * 4*k                 表示在 scratch 槽位数组中按槽位索引递进。
+ */
+#define STACK_OFFSET(k)	(-4 - (4 * NR_SAVED_REGISTERS) - (4 * (k)))
+
+/* JIT 代码生成过程中使用的内部临时寄存器编号（区别于 BPF 语义寄存器编号）。 */
+#define TMP_REG_1	(MAX_BPF_JIT_REG + 0)
+#define TMP_REG_2	(MAX_BPF_JIT_REG + 1)
+
+/* 尾调用计数器寄存器及其备份寄存器在 RV32 物理寄存器上的固定绑定。 */
+#define RV_REG_TCC		RV_REG_T6
+#define RV_REG_TCC_SAVED	RV_REG_S7
+```
 
 ## 分段 2：基础辅助函数（取高低位、装立即数、取放寄存器、跳转）
 
