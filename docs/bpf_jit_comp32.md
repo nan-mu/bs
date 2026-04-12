@@ -93,10 +93,27 @@ enum {
 #define RV_REG_TCC_SAVED	RV_REG_S7
 ```
 
-## 分段 2：基础辅助函数（取高低位、装立即数、取放寄存器、跳转）
+### 直接寄存器转换
 
-### 2.1 `hi` / `lo`
-- 从 `{hi, lo}` 对中取对应分量。
+根据上一节对高低32位进行的约束，部分 BPF 寄存器能够一一映射到中间寄存器，即32位BPF寄存器，这将优化编译流程。在转换过程中需要区分三类寄存器。下表给出了 bpf2rv32 映射表中各 BPF 寄存器（含 JIT 内部临时寄存器）的语义角色及其在 RV32 后端中的映射结果。其中 `{hi, lo}` 分别表示 64 位 BPF 寄存器拆分后的高 32 位与低 32 位承载位置；该位置既可能是 RV32 物理寄存器，也可能是相对帧指针 `fp` 的栈槽偏移。
+
+| 寄存器名称 | 寄存器的功能 | 转换结果 |
+|---|---|---|
+| `BPF_REG_0` | eBPF 返回值寄存器；也用于接收内核函数返回值 | `{hi, lo} = {RV_REG_S2, RV_REG_S1}` |
+| `BPF_REG_1` | eBPF 向内核函数传参寄存器 | `{hi, lo} = {RV_REG_A1, RV_REG_A0}` |
+| `BPF_REG_2` | eBPF 向内核函数传参寄存器 | `{hi, lo} = {RV_REG_A3, RV_REG_A2}` |
+| `BPF_REG_3` | eBPF 向内核函数传参寄存器 | `{hi, lo} = {RV_REG_A5, RV_REG_A4}` |
+| `BPF_REG_4` | eBPF 向内核函数传参寄存器 | `{hi, lo} = {RV_REG_A7, RV_REG_A6}` |
+| `BPF_REG_5` | eBPF 向内核函数传参寄存器 | `{hi, lo} = {RV_REG_S4, RV_REG_S3}` |
+| `BPF_REG_6` | eBPF callee-saved 寄存器，跨调用需要保持 | `{hi, lo} = {STACK_OFFSET(BPF_R6_HI), STACK_OFFSET(BPF_R6_LO)}` |
+| `BPF_REG_7` | eBPF callee-saved 寄存器，跨调用需要保持 | `{hi, lo} = {STACK_OFFSET(BPF_R7_HI), STACK_OFFSET(BPF_R7_LO)}` |
+| `BPF_REG_8` | eBPF callee-saved 寄存器，跨调用需要保持 | `{hi, lo} = {STACK_OFFSET(BPF_R8_HI), STACK_OFFSET(BPF_R8_LO)}` |
+| `BPF_REG_9` | eBPF callee-saved 寄存器，跨调用需要保持 | `{hi, lo} = {STACK_OFFSET(BPF_R9_HI), STACK_OFFSET(BPF_R9_LO)}` |
+| `BPF_REG_FP` | eBPF 只读帧指针，用于访问 BPF 栈 | `{hi, lo} = {RV_REG_S6, RV_REG_S5}` |
+| `BPF_REG_AX` | JIT 内部临时寄存器，用于常量 blinding 等中间操作 | `{hi, lo} = {STACK_OFFSET(BPF_AX_HI), STACK_OFFSET(BPF_AX_LO)}` |
+| `TMP_REG_1` | JIT 内部临时寄存器，用于操作栈上的 BPF 寄存器值 | `{hi, lo} = {RV_REG_T3, RV_REG_T2}` |
+| `TMP_REG_2` | JIT 内部临时寄存器，用于操作栈上的 BPF 寄存器值 | `{hi, lo} = {RV_REG_T5, RV_REG_T4}` |
+
 
 ### 2.2 `emit_imm`
 - 向 RV32 寄存器装载 32 位立即数。
