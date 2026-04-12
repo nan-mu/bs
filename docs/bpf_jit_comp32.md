@@ -33,7 +33,7 @@ Stack layout during BPF program execution:
                     low
 ```
 
-> `high/low` 表示栈地址方向（上高下低）；`RV32 fp` 与 `RV32 sp` 分别表示当前函数的帧指针与栈指针位置；`saved ra`、`saved fp` 及 `RV32 callee-saved registers` 指由被调用者负责保存与恢复的寄存器现场；`JIT scratch space for BPF registers` 指 JIT 为 BPF 寄存器临时周转与溢出保存预留的栈区，`hi(R6)`、`lo(R6)` 等表示同一 BPF 64 位寄存器在 RV32 上拆分后的高/低 32 位槽位；`BPF_REG_FP` 标识 BPF 帧指针对应的位置；`BPF program stack` 为 BPF 程序语义上的专用栈区；`Function call stack` 为通用函数调用链继续向低地址扩展的常规调用栈区。
+> 上图中：`high/low` 表示栈地址方向（上高下低）；`RV32 fp` 与 `RV32 sp` 分别表示当前函数的帧指针与栈指针位置；`saved ra`、`saved fp` 及 `RV32 callee-saved registers` 指由被调用者负责保存与恢复的寄存器现场；`JIT scratch space for BPF registers` 指 JIT 为 BPF 寄存器临时周转与溢出保存预留的栈区，`hi(R6)`、`lo(R6)` 等表示同一 BPF 64 位寄存器在 RV32 上拆分后的高/低 32 位槽位；`BPF_REG_FP` 标识 BPF 帧指针对应的位置；`BPF program stack` 为 BPF 程序语义上的专用栈区；`Function call stack` 为通用函数调用链继续向低地址扩展的常规调用栈区。
 
 栈在该实现中承担运行时状态承载与调用现场维护的双重职能。对于 RV32 目标架构，JIT 产物作为标准函数实体执行，必须在进入与退出路径上满足 RISC-V ABI 对寄存器保存和恢复的约束，因此需要构造可验证、可逆的栈帧组织。
 
@@ -45,7 +45,7 @@ Stack layout during BPF program execution:
 
 ### 枚举与宏
 
-本节面向 RV32 eBPF JIT 的寄存器与栈槽约束进行符号化定义，其核心目标是将多组底层约束收敛为统一接口，包括 BPF 64 位寄存器在 RV32 上的 hi/lo 拆分表示、落栈寄存器在栈帧中的槽位编号与相对 `fp` 的偏移寻址，以及 JIT 内部临时寄存器与尾调用计数寄存器的稳定绑定。若上述约束以分散常量散布于实现逻辑，将导致偏移语义不一致、槽位冲突，并使寄存器映射与栈寻址关系难以整体校验。
+本节介绍寄存器与栈槽约束的枚举与宏定义，目标是对后续指令进行约束。具体来说 BPF 64 位寄存器在 RV32 上需要进行 hi/lo 拆分表示、落栈寄存器在栈帧中的槽位编号与相对 `fp` 的偏移寻址，以及 JIT 内部临时寄存器与尾调用计数寄存器的稳定绑定。若上述约束以分散常量散布于实现逻辑，将导致偏移语义不一致、槽位冲突，并使寄存器映射与栈寻址关系难以整体校验。
 
 ```c
 enum {
