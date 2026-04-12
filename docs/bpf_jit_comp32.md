@@ -1,16 +1,8 @@
-# `bpf_jit_comp32.c` 全量分段讲解（RV32 eBPF JIT）
+# Linux 内核中的 JIT
 
----
+本文实现的功能本质上属于 AOT（Ahead-of-Time，预先编译）：在程序实际执行之前，先将 BPF 字节码转换为 RV32 指令。就整体流程而言，它与 Linux 现有 JIT 将 BPF 字节码编译为 RV32 指令的逻辑基本一致。本文计划在此基础上，将 Linux 内核中的相关实现重写为 Rust 程序，并补充相应的测试用例。本节将重点介绍 Linux 源码中 JIT 的实现细节，以及相关测试用例的组织方式。
 
-## 分段 1：文件头、栈布局、基础常量与寄存器映射
-
-### 1.1 文件头与依赖
-- SPDX：`GPL-2.0`
-- 文件功能：将 eBPF 指令 JIT 编译为 RV32 指令序列。
-- 主要依赖：
-  - `<linux/bpf.h>`
-  - `<linux/filter.h>`
-  - `"bpf_jit.h"`
+## JIT 编译器
 
 ### 栈布局
 
@@ -29,7 +21,7 @@ Stack layout during BPF program execution:
                 |  lo(R7)  |
                 |   ...    |
  BPF_REG_FP =>  +----------+ <= (fp - 4 * NR_SAVED_REGISTERS
-                |          |        - 4 * BPF_JIT_SCRATCH_REGS)
+                |          |        - 4 * BPF_JIT_S+CRATCH_REGS)
                 |          |
                 |   ...    | BPF program stack
                 |          |
