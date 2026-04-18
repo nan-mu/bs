@@ -9,3 +9,7 @@
 [submodule "firmware"]
 	path = firmware
 	url = git@github.com:nan-mu/firmware.git
+
+[submodule "c2rust"]
+	path = c2rust
+	url = git@github.com:nan-mu/c2rust.git
