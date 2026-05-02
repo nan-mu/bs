@@ -2,14 +2,10 @@
 	path = libbpf
 	url = https://github.com/libbpf/libbpf.git
 
-[submodule "aot"]
-	path = aot
-	url = git@github.com:nan-mu/aot.git
-
 [submodule "firmware"]
 	path = firmware
 	url = git@github.com:nan-mu/firmware.git
 
-[submodule "c2rust"]
-	path = c2rust
-	url = git@github.com:nan-mu/c2rust.git
+[submodule "xdp4"]
+	path = xdp4
+	url = https://github.com/nan-mu/xdp4.git
